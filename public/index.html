@@ -1,58 +1,202 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Chat App</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      background-color: #202225;
-      color: white;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    :root {
+      --base: #1E1E2E;
+      --surface0: #313244;
+      --surface1: #45475A;
+      --overlay0: #6C7086;
+      --text: #CDD6F4;
+      --blue: #89B4FA;
+      --sky: #89DCEB;
+      --mauve: #CBA6F7;
+      --red: #F38BA8;
+      --font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Reset and Scrollbar */
+    * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
+    }
+
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface1); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--overlay0); }
+
+    body {
+      background-color: var(--base);
+      color: var(--text);
+      font-family: var(--font-family);
+      margin: 0;
+      padding: 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      height: 100vh;
-      transition: background 0.3s;
+      min-height: 100vh;
+      transition: background 0.5s ease;
       background-size: cover;
       background-position: center;
+      background-image: linear-gradient(135deg, rgba(30, 30, 46, 0.95), rgba(22, 22, 34, 0.95));
+      overflow: hidden; /* Prevent scrollbars from appearing due to canvas */
+    }
+    
+    #starfall-canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
     }
 
+    /* Welcome Screen */
+    #welcomeScreen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      padding: 40px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    #errorMessage {
+      color: var(--red);
+      margin-top: 10px;
+      display: none;
+      font-weight: 500;
+    }
+
+    /* Chat Screen */
     #chatScreen {
       display: none;
-      width: 90%;
-      max-width: 600px;
-      height: 70%;
-      background-color: #2f3136;
-      border-radius: 10px;
-      padding: 20px;
+      width: 100%;
+      max-width: 800px;
+      height: 85vh;
+      max-height: 900px;
+      padding: 24px;
       flex-direction: column;
-      display: flex;
-      justify-content: flex-end;
+      position: relative;
+      z-index: 1;
     }
 
     #chatBox {
       flex-grow: 1;
       overflow-y: auto;
       margin-bottom: 20px;
-      padding: 10px;
-      background-color: #36393f;
+      padding: 8px;
+      background-color: rgba(17, 17, 27, 0.5);
       border-radius: 8px;
-      box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
     }
 
+    /* Messages */
+    .message {
+      padding: 12px 16px;
+      border-radius: 8px;
+      max-width: 75%;
+      word-wrap: break-word;
+      opacity: 0;
+      animation: fadeIn 0.4s ease-out forwards;
+      position: relative;
+      line-height: 1.5;
+      padding-bottom: 28px;
+      border: 1px solid transparent;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .my-message {
+      background-color: rgba(137, 180, 250, 0.2);
+      border-color: rgba(137, 180, 250, 0.5);
+      color: var(--text);
+      align-self: flex-end;
+    }
+
+    .other-message {
+      background-color: var(--surface0);
+      align-self: flex-start;
+    }
+
+    .timestamp {
+      font-size: 11px;
+      color: var(--overlay0);
+      position: absolute;
+      bottom: 8px;
+      right: 16px;
+      opacity: 0.8;
+    }
+    
+    .my-message .timestamp {
+      color: rgba(137, 180, 250, 0.8);
+    }
+
+    /* Inputs and Buttons */
     input {
-      padding: 10px;
-      border: 1px solid #444;
-      border-radius: 4px;
-      background-color: #40444b;
-      color: white;
-      width: 96.8%;
+      padding: 12px 16px;
+      border: 1px solid var(--surface1);
+      border-radius: 8px;
+      background-color: rgba(17, 17, 27, 0.7);
+      color: var(--text);
+      width: 100%;
+      font-size: 1rem;
+      font-family: var(--font-family);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
 
+    input#nameInput { width: 300px; max-width: 80vw; }
+    
+    input::placeholder {
+        color: var(--overlay0);
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(137, 180, 250, 0.3);
+    }
+
+    button {
+      background-color: var(--sky);
+      color: var(--base);
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 1rem;
+      font-family: var(--font-family);
+      transition: background-color 0.2s, transform 0.1s;
+      width: 100%;
+    }
+
+    button:hover {
+      background-color: var(--mauve);
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    /* Modal & Overlay */
     #backgroundOverlay {
       display: none;
       position: fixed;
@@ -60,142 +204,97 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
-      backdrop-filter: blur(5px);
+      background-color: rgba(17, 24, 39, 0.3);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       z-index: 999;
     }
 
-    button {
-  background-color: #4CAF50;
-  color: white;
-  padding: 10px 20px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  width: 80%;
-  margin-top: 10px; /* Adjust this value to move the button down */
-}
-
-
-    #welcomeScreen {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    #errorMessage {
-      color: red;
-      margin-top: 10px;
-      display: none;
-    }
-
-    .message {
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 5px;
-      max-width: 75%;
-      word-wrap: break-word;
-      opacity: 0;
-      animation: fadeIn 1s forwards;
-      position: relative;
-    }
-
-    .my-message {
-      background-color: #4CAF50;
-      align-self: flex-start;
-    }
-
-    .other-message {
-      background-color: #7289da;
-      align-self: flex-end;
-    }
-
-    .timestamp {
-      font-size: 10px;
-      position: absolute;
-      bottom: 5px;
-      right: 5px;
-      opacity: 0.7;
-    }
-
-    @keyframes fadeIn {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
     .modal {
-  visibility: hidden;       /* Hidden by default */
-  opacity: 0;               /* Fully transparent */
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-color: rgba(40, 44, 52, 0.6);
-  border-radius: 10px;
-  padding: 60px;
-  z-index: 1000;
-  transition: opacity 0.5s ease-in-out, visibility 0s 0.5s; /* Fade-in and delay visibility */
-}
-
-/* When modal is shown, make it visible with fade-in */
-.modal.show {
-  visibility: visible;      /* Make it visible */
-  opacity: 1;               /* Make it fully opaque */
-  transition-delay: 0s;      /* Allow the opacity to fade in immediately */
-}
-
-/* Modal content (already centered, no changes here) */
-.modal-content {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Button inside the modal */
-.modal-button {
-  background-color: #4CAF50;
-  color: white;
-  padding: 10px 10px;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  width: 200%;
-  margin: 10px 0;
-  z-index: 1001;
-}
-
-    body.blurred {
-      filter: blur(1px);
-      z-index: 0;
+      visibility: hidden;
+      opacity: 0;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      padding: 24px;
+      z-index: 1000;
+      transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s 0.3s;
+      transform: translate(-50%, -45%) scale(0.95);
     }
 
+    .modal.show {
+      visibility: visible;
+      opacity: 1;
+      transition-delay: 0s;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    .modal-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-button {
+      width: 200px;
+    }
+
+    #editButton { background-color: var(--blue); color: var(--base); }
+    #deleteButton { background-color: var(--red); color: var(--base); }
+    #closeButton { background-color: var(--surface1); color: var(--text); }
+
+    /* Background Button */
     #backgroundButton {
       position: fixed;
-      bottom: 10px;
-      left: 10px;
-      background-color: #4CAF50;
-      color: white;
-      padding: 3px 6px;
-      width: 80px;
-      border: none;
-      border-radius: 5px;
+      bottom: 20px;
+      left: 20px;
+      background-color: rgba(49, 50, 68, 0.8);
+      backdrop-filter: blur(5px);
+      -webkit-backdrop-filter: blur(5px);
+      color: var(--text);
+      padding: 10px 16px;
+      width: auto;
+      border: 1px solid var(--surface1);
+      border-radius: 8px;
       cursor: pointer;
-      font-size: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      font-size: 0.9rem;
+      font-weight: 500;
+      z-index: 100;
     }
 
     #backgroundInput {
       display: none;
     }
+
+    /* Glassmorphism Containers */
+    #welcomeScreen, #chatScreen, .modal {
+      background-color: rgba(30, 30, 46, 0.7);
+      backdrop-filter: blur(15px) saturate(180%);
+      -webkit-backdrop-filter: blur(15px) saturate(180%);
+      border-radius: 12px;
+      border: 1px solid rgba(205, 214, 244, 0.2);
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
   </style>
+<script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.1.1/",
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/"
+  }
+}
+</script>
 </head>
 <body>
 
+<canvas id="starfall-canvas"></canvas>
+
 <div id="welcomeScreen">
   <input id="nameInput" type="text" placeholder="Enter your name" />
-  <button id="enterButton">Enter</button>
+  <button id="enterButton">Enter Chat</button>
   <div id="errorMessage"></div>
 </div>
 
@@ -234,6 +333,7 @@
     const savedBackgroundImage = localStorage.getItem('backgroundImage');
     if (savedBackgroundImage) {
       document.body.style.backgroundImage = `url(${savedBackgroundImage})`;
+      document.body.style.backgroundBlendMode = 'overlay';
     }
   };
 
@@ -241,8 +341,6 @@
     document.getElementById('backgroundInput').click();
   });
   
-  
-
   document.getElementById('backgroundInput').addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -262,35 +360,34 @@
     });
   });
 
-  // Check if the notification permission is granted, if not request permission
-if (Notification.permission !== 'granted') {
-  Notification.requestPermission();
-}
-
-// Function to show a browser notification
-function showNotification(message) {
-  if (Notification.permission === 'granted') {
-    new Notification('New Message', {
-      body: message,
-      icon: '/path/to/your/icon.png' // Optional: Add an icon for the notification
-    });
+  if (Notification.permission !== 'granted') {
+    Notification.requestPermission();
   }
-}
 
-// Listen for new messages from the socket server
-socket.on('newMessage', (messageData) => {
-  // Display the message in the chat
-  displayMessage(messageData.sender, messageData.message, messageData.time, messageData.messageId);
-  
-  // Show a notification for the new message
-  showNotification(`${messageData.sender}: ${messageData.message}`);
-});
+  function showNotification(message) {
+    if (Notification.permission === 'granted' && document.hidden) {
+      new Notification('New Message', {
+        body: message,
+      });
+    }
+  }
+
+  socket.on('newMessage', (messageData) => {
+    displayMessage(messageData.sender, messageData.message, messageData.time, messageData.messageId);
+    if(messageData.sender !== userName) {
+      showNotification(`${messageData.sender}: ${messageData.message}`);
+    }
+  });
 
 
   socket.on('editedMessage', (messageData) => {
     const messageDiv = document.querySelector(`[data-id="${messageData.messageId}"]`);
     if (messageDiv) {
+      const timestamp = messageDiv.querySelector('.timestamp');
       messageDiv.textContent = `${messageData.sender}: ${messageData.message}`;
+      if (timestamp) {
+        messageDiv.appendChild(timestamp);
+      }
     }
   });
 
@@ -302,6 +399,9 @@ socket.on('newMessage', (messageData) => {
   });
 
   function displayMessage(sender, message, time, messageId) {
+    const chatBox = document.getElementById('chatBox');
+    const shouldScroll = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 20;
+
     const messageDiv = document.createElement('div');
     messageDiv.classList.add('message', sender === userName ? 'my-message' : 'other-message');
     messageDiv.textContent = `${sender}: ${message}`;
@@ -312,7 +412,11 @@ socket.on('newMessage', (messageData) => {
     timestamp.textContent = time;
     messageDiv.appendChild(timestamp);
 
-    document.getElementById('chatBox').appendChild(messageDiv);
+    chatBox.appendChild(messageDiv);
+    
+    if (shouldScroll || sender === userName) {
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
 
     messageDiv.addEventListener('click', () => {
       if (sender === userName) {
@@ -323,79 +427,130 @@ socket.on('newMessage', (messageData) => {
   }
 
   function openModal() {
-  document.getElementById('modal').classList.add('show');
-  document.getElementById('backgroundOverlay').style.display = 'block';
-}
+    document.getElementById('modal').classList.add('show');
+    document.getElementById('backgroundOverlay').style.display = 'block';
+  }
 
   document.getElementById('closeButton').addEventListener('click', closeModal);
+  document.getElementById('backgroundOverlay').addEventListener('click', closeModal);
+
 
   function closeModal() {
-  document.getElementById('modal').classList.remove('show');
-  document.getElementById('backgroundOverlay').style.display = 'none';
-}
+    document.getElementById('modal').classList.remove('show');
+    document.getElementById('backgroundOverlay').style.display = 'none';
+  }
 
   document.getElementById('editButton').addEventListener('click', () => {
     const newMessage = prompt('Edit your message:');
-    if (newMessage) {
-      socket.emit('editMessage', { messageId: currentMessageId, newMessage });
+    if (newMessage && newMessage.trim() !== '') {
+      socket.emit('editMessage', { messageId: currentMessageId, newMessage: newMessage.trim() });
     }
     closeModal();
   });
 
   document.getElementById('deleteButton').addEventListener('click', () => {
-    socket.emit('deleteMessage', currentMessageId);
+    if(confirm('Are you sure you want to delete this message?')) {
+        socket.emit('deleteMessage', currentMessageId);
+    }
     closeModal();
   });
 
   document.getElementById('enterButton').addEventListener('click', () => {
-  const nameInput = document.getElementById('nameInput');
-  if (nameInput.value.trim() === '') {
-    document.getElementById('errorMessage').textContent = 'Name cannot be empty!';
-    document.getElementById('errorMessage').style.display = 'block';
-    return;
-  }
-  userName = nameInput.value.trim();
-  localStorage.setItem('userName', userName);
-  document.getElementById('welcomeScreen').style.display = 'none';
-  document.getElementById('chatScreen').style.display = 'flex';
+    const nameInput = document.getElementById('nameInput');
+    if (nameInput.value.trim() === '') {
+      document.getElementById('errorMessage').textContent = 'Name cannot be empty!';
+      document.getElementById('errorMessage').style.display = 'block';
+      return;
+    }
+    userName = nameInput.value.trim();
+    localStorage.setItem('userName', userName);
+    document.getElementById('welcomeScreen').style.display = 'none';
+    document.getElementById('chatScreen').style.display = 'flex';
 
-  // **Request notification permission here**
-  if (Notification.permission !== 'granted') {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        console.log('Notification permission granted');
-      } else {
-        console.log('Notification permission denied');
+    if (Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+  });
+
+  document.getElementById('messageInput').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      const message = event.target.value.trim();
+      if (message === '') return;
+
+      const now = new Date();
+      const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+
+      socket.emit('sendMessage', { sender: userName, message, time });
+      event.target.value = '';
+    }
+  });
+
+  // Starfall Animation Script
+  const canvas = document.getElementById('starfall-canvas');
+  const ctx = canvas.getContext('2d');
+
+  let stars = [];
+  const numStars = 150;
+
+  function setCanvasSize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+
+  function createStars() {
+    stars = [];
+    for (let i = 0; i < numStars; i++) {
+      stars.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        length: Math.random() * 15 + 10, // Increased length
+        speed: Math.random() * 1 + 0.5,     // Increased speed
+        opacity: Math.random() * 0.8 + 0.2,
+      });
+    }
+  }
+
+  function drawStars() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Add a glow effect
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = 'rgba(205, 214, 244, 0.5)';
+
+    stars.forEach(star => {
+      ctx.beginPath();
+      ctx.moveTo(star.x, star.y);
+      ctx.lineTo(star.x, star.y + star.length);
+      ctx.strokeStyle = `rgba(205, 214, 244, ${star.opacity})`;
+      ctx.lineWidth = 1.5; // Increased thickness
+      ctx.stroke();
+    });
+  }
+
+  function updateStars() {
+    stars.forEach(star => {
+      star.y += star.speed;
+      if (star.y > canvas.height) {
+        star.y = 0 - star.length;
+        star.x = Math.random() * canvas.width;
       }
     });
   }
-});
 
-// Prevent sending messages without a name
-document.getElementById('messageInput').addEventListener('keydown', (event) => {
-  if (!userName) {  // If no username is set
-    document.getElementById('errorMessage').textContent = 'Please enter a name before chatting!';
-    document.getElementById('errorMessage').style.display = 'block';
-    return;
+  function animate() {
+    updateStars();
+    drawStars();
+    requestAnimationFrame(animate);
   }
 
-  if (event.key === 'Enter') {
-    const message = event.target.value.trim();
-    if (message === '') return;
+  window.addEventListener('resize', () => {
+    setCanvasSize();
+    createStars();
+  });
 
-    // Format time in 12-hour format
-    const now = new Date();
-    const hours = now.getHours() % 12 || 12;  // Handle 12-hour format
-    const minutes = now.getMinutes().toString().padStart(2, '0');
-    const amPm = now.getHours() >= 12 ? 'PM' : 'AM';
-
-    const time = `${hours}:${minutes} ${amPm}`;
-
-    // Send the message through the socket
-    socket.emit('sendMessage', { sender: userName, message, time });
-    event.target.value = '';  // Clear the input
-  }
-});
+  setCanvasSize();
+  createStars();
+  animate();
 
 </script>
 </body>
