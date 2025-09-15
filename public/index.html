@@ -97,26 +97,61 @@
       flex-grow: 1;
       overflow-y: auto;
       margin-bottom: 20px;
-      padding: 8px;
+      padding: 8px 16px;
       background-color: rgba(17, 17, 27, 0.5);
       border-radius: 8px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 20px;
     }
 
     /* Messages */
     .message {
-      padding: 12px 16px;
-      border-radius: 8px;
-      max-width: 75%;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      max-width: 85%;
       word-wrap: break-word;
       opacity: 0;
       animation: fadeIn 0.4s ease-out forwards;
+    }
+
+    .message-body {
+      display: flex;
+      flex-direction: column;
+      padding: 12px 16px;
+      border-radius: 8px;
       position: relative;
       line-height: 1.5;
       padding-bottom: 28px;
       border: 1px solid transparent;
+      min-width: 150px;
+    }
+    
+    .pfp-avatar, .pfp-default {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+
+    .pfp-avatar {
+      object-fit: cover;
+    }
+    
+    .pfp-default {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.2rem;
+    }
+
+    .sender-name {
+        font-weight: 700;
+        font-size: 0.9rem;
+        margin-bottom: 6px;
     }
 
     @keyframes fadeIn {
@@ -125,16 +160,34 @@
     }
 
     .my-message {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    
+    .my-message .message-body {
       background-color: rgba(137, 180, 250, 0.2);
       border-color: rgba(137, 180, 250, 0.5);
       color: var(--text);
-      align-self: flex-end;
+    }
+    
+    .my-message .pfp-default {
+        background-color: rgba(137, 180, 250, 0.2);
+        color: var(--blue);
     }
 
     .other-message {
-      background-color: var(--surface0);
       align-self: flex-start;
     }
+    
+    .other-message .message-body {
+      background-color: var(--surface0);
+    }
+
+    .other-message .pfp-default {
+        background-color: var(--surface1);
+        color: var(--text);
+    }
+
 
     .timestamp {
       font-size: 11px;
@@ -264,7 +317,7 @@
       z-index: 100;
     }
 
-    #backgroundInput {
+    #backgroundInput, #pfpInput {
       display: none;
     }
 
@@ -306,6 +359,7 @@
 <button id="settingsButton">Settings</button>
 <div id="backgroundOverlay"></div>
 <input type="file" id="backgroundInput" accept="image/*" />
+<input type="file" id="pfpInput" accept="image/*" />
 
 <div id="modal" class="modal">
   <div class="modal-content">
@@ -318,6 +372,7 @@
 <div id="settingsModal" class="modal">
   <div class="modal-content">
     <button id="changeBackgroundButton" class="modal-button">Change Background</button>
+    <button id="selectPFPButton" class="modal-button">Select Profile Picture</button>
     <button id="toggleStarfallButton" class="modal-button">Toggle Starfall: On</button>
     <button id="closeSettingsButton" class="modal-button">Close</button>
   </div>
@@ -328,7 +383,7 @@
 <script>
   const socket = io();
   let userName = '';
-  let lastMessageTime = 0;
+  let userPFP = null;
   let currentMessageId = '';
   let starfallEnabled = true;
   let animationFrameId;
@@ -346,6 +401,8 @@
     if (savedBackgroundImage) {
       document.body.style.backgroundImage = `url(${savedBackgroundImage})`;
     }
+    
+    userPFP = localStorage.getItem('userPFP');
 
     const starfallPref = localStorage.getItem('starfallEnabled');
     if (starfallPref === 'false') {
@@ -370,6 +427,11 @@
       closeSettingsModal();
   });
   
+  document.getElementById('selectPFPButton').addEventListener('click', () => {
+      document.getElementById('pfpInput').click();
+      closeSettingsModal();
+  });
+  
   document.getElementById('toggleStarfallButton').addEventListener('click', () => {
     starfallEnabled = !starfallEnabled;
     localStorage.setItem('starfallEnabled', starfallEnabled);
@@ -381,7 +443,7 @@
     if (starfallEnabled) {
       animate();
     } else {
-      cancelAnimationFrame(animationFrameId);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
@@ -399,10 +461,23 @@
       reader.readAsDataURL(file);
     }
   });
+  
+  document.getElementById('pfpInput').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const pfpUrl = e.target.result;
+        userPFP = pfpUrl;
+        localStorage.setItem('userPFP', pfpUrl);
+      };
+      reader.readAsDataURL(file);
+    }
+  });
 
   socket.on('previousMessages', (messages) => {
-    messages.forEach(message => {
-      displayMessage(message.sender, message.message, message.time, message.messageId);
+    messages.forEach(msg => {
+      displayMessage(msg.sender, msg.message, msg.time, msg.messageId, msg.pfp);
     });
   });
 
@@ -419,7 +494,7 @@
   }
 
   socket.on('newMessage', (messageData) => {
-    displayMessage(messageData.sender, messageData.message, messageData.time, messageData.messageId);
+    displayMessage(messageData.sender, messageData.message, messageData.time, messageData.messageId, messageData.pfp);
     if(messageData.sender !== userName) {
       showNotification(`${messageData.sender}: ${messageData.message}`);
     }
@@ -427,13 +502,9 @@
 
 
   socket.on('editedMessage', (messageData) => {
-    const messageDiv = document.querySelector(`[data-id="${messageData.messageId}"]`);
+    const messageDiv = document.querySelector(`[data-id="${messageData.messageId}"] .message-content`);
     if (messageDiv) {
-      const timestamp = messageDiv.querySelector('.timestamp');
-      messageDiv.textContent = `${messageData.sender}: ${messageData.message}`;
-      if (timestamp) {
-        messageDiv.appendChild(timestamp);
-      }
+        messageDiv.textContent = messageData.newMessage;
     }
   });
 
@@ -444,27 +515,53 @@
     }
   });
 
-  function displayMessage(sender, message, time, messageId) {
+  function displayMessage(sender, message, time, messageId, pfp) {
     const chatBox = document.getElementById('chatBox');
-    const shouldScroll = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 20;
+    const shouldScroll = chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 50;
 
-    const messageDiv = document.createElement('div');
-    messageDiv.classList.add('message', sender === userName ? 'my-message' : 'other-message');
-    messageDiv.textContent = `${sender}: ${message}`;
-    messageDiv.dataset.id = messageId;
+    const messageContainer = document.createElement('div');
+    messageContainer.classList.add('message', sender === userName ? 'my-message' : 'other-message');
+    messageContainer.dataset.id = messageId;
+    
+    // Avatar
+    if (pfp) {
+        const avatar = document.createElement('img');
+        avatar.src = pfp;
+        avatar.classList.add('pfp-avatar');
+        messageContainer.appendChild(avatar);
+    } else {
+        const defaultAvatar = document.createElement('div');
+        defaultAvatar.classList.add('pfp-default');
+        defaultAvatar.textContent = sender.charAt(0).toUpperCase();
+        messageContainer.appendChild(defaultAvatar);
+    }
+
+    const messageBody = document.createElement('div');
+    messageBody.classList.add('message-body');
+    
+    const senderName = document.createElement('div');
+    senderName.classList.add('sender-name');
+    senderName.textContent = sender;
+    messageBody.appendChild(senderName);
+    
+    const messageContent = document.createElement('div');
+    messageContent.classList.add('message-content');
+    messageContent.textContent = message;
+    messageBody.appendChild(messageContent);
 
     const timestamp = document.createElement('span');
     timestamp.classList.add('timestamp');
     timestamp.textContent = time;
-    messageDiv.appendChild(timestamp);
-
-    chatBox.appendChild(messageDiv);
+    messageBody.appendChild(timestamp);
+    
+    messageContainer.appendChild(messageBody);
+    chatBox.appendChild(messageContainer);
     
     if (shouldScroll || sender === userName) {
         chatBox.scrollTop = chatBox.scrollHeight;
     }
 
-    messageDiv.addEventListener('click', () => {
+    messageBody.addEventListener('click', () => {
       if (sender === userName) {
         currentMessageId = messageId;
         openModal();
@@ -496,8 +593,9 @@
   });
 
   document.getElementById('editButton').addEventListener('click', () => {
-    const newMessage = prompt('Edit your message:');
-    if (newMessage && newMessage.trim() !== '') {
+    const currentMessageContent = document.querySelector(`[data-id="${currentMessageId}"] .message-content`).textContent;
+    const newMessage = prompt('Edit your message:', currentMessageContent);
+    if (newMessage && newMessage.trim() !== '' && newMessage.trim() !== currentMessageContent) {
       socket.emit('editMessage', { messageId: currentMessageId, newMessage: newMessage.trim() });
     }
     closeModal();
@@ -535,7 +633,7 @@
       const now = new Date();
       const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-      socket.emit('sendMessage', { sender: userName, message, time });
+      socket.emit('sendMessage', { sender: userName, message, time, pfp: userPFP });
       event.target.value = '';
     }
   });
@@ -558,17 +656,17 @@
       stars.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        length: Math.random() * 15 + 10, // Increased length
-        speed: Math.random() * 1 + 0.5,     // Increased speed
+        length: Math.random() * 15 + 10,
+        speed: Math.random() * 1 + 0.5,
         opacity: Math.random() * 0.8 + 0.2,
       });
     }
   }
 
   function drawStars() {
+    if (!canvas.getContext) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Add a glow effect
     ctx.shadowBlur = 10;
     ctx.shadowColor = 'rgba(205, 214, 244, 0.5)';
 
@@ -577,7 +675,7 @@
       ctx.moveTo(star.x, star.y);
       ctx.lineTo(star.x, star.y + star.length);
       ctx.strokeStyle = `rgba(205, 214, 244, ${star.opacity})`;
-      ctx.lineWidth = 1.5; // Increased thickness
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     });
   }
