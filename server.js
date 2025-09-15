@@ -67,6 +67,7 @@ io.on('connection', (socket) => {
     const now = new Date();
     const formattedTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+    // message object already contains sender, message, time, and pfp
     const newMessage = { ...message, messageId, time: formattedTime };
 
     // Add the new message to the messages array
@@ -81,7 +82,8 @@ io.on('connection', (socket) => {
     const index = messages.findIndex(msg => msg.messageId === messageData.messageId);
     if (index !== -1) {
       messages[index].message = messageData.newMessage;
-      io.emit('editedMessage', messages[index]);
+      // We only need to send the ID and new text, the client will handle the update
+      io.emit('editedMessage', { messageId: messageData.messageId, newMessage: messageData.newMessage });
     }
   });
 
@@ -105,4 +107,3 @@ io.on('connection', (socket) => {
 server.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
 });
-     
