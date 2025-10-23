@@ -1,18 +1,22 @@
-const express = require('express');
-const http = require('http');
-const socketIo = require('socket.io');
-const path = require('path');
-const { v4: uuidv4 } = require('uuid'); // To generate unique message IDs
-const fs = require('fs'); // File system module to read/write the JSON file
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import path from "path";
+import { v4 as uuidv4 } from "uuid";
+import fs from "fs";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const io = new Server(server); // ✅ must use 'new'
 
 const port = 8000;
 
 // Path to the names.json file
-const namesFilePath = path.join(__dirname, 'names.json');
+const namesFilePath = path.join(__dirname, "names.json");
 
 // Read the names from the names.json file
 let takenNames = [];
@@ -25,17 +29,19 @@ if (fs.existsSync(namesFilePath)) {
 let messages = [];
 
 // Serve static files (e.g., front-end)
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
 // Middleware to handle JSON data
 app.use(express.json());
 
 // Route to check if a name is taken and set the user's name
-app.post('/set-name', (req, res) => {
+app.post("/set-name", (req, res) => {
   const { userName } = req.body;
 
   if (!userName || takenNames.includes(userName)) {
-    return res.status(400).json({ success: false, message: 'Name already taken or invalid.' });
+    return res
+      .status(400)
+      .json({ success: false, message: "Name already taken or invalid." });
   }
 
   // Add the new username to the takenNames array
@@ -48,24 +54,28 @@ app.post('/set-name', (req, res) => {
 });
 
 // Default route to serve the HTML page
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // WebSocket to handle real-time chat messages
-io.on('connection', (socket) => {
-  console.log('A user connected');
+io.on("connection", (socket) => {
+  console.log("A user connected");
 
   // Send all previous messages to the newly connected client
-  socket.emit('previousMessages', messages);
+  socket.emit("previousMessages", messages);
 
   // Listen for new chat messages from a user
-  socket.on('sendMessage', (message) => {
+  socket.on("sendMessage", (message) => {
     const messageId = uuidv4(); // Generate a unique message ID
 
     // Correct time format using the system's local time zone
     const now = new Date();
-    const formattedTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const formattedTime = now.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
 
     // message object already contains sender, message, time, and pfp
     const newMessage = { ...message, messageId, time: formattedTime };
@@ -74,32 +84,37 @@ io.on('connection', (socket) => {
     messages.push(newMessage);
 
     // Broadcast the new message to all connected clients
-    io.emit('newMessage', newMessage);
+    io.emit("newMessage", newMessage);
   });
 
   // Listen for an edit message request from a client
-  socket.on('editMessage', (messageData) => {
-    const index = messages.findIndex(msg => msg.messageId === messageData.messageId);
+  socket.on("editMessage", (messageData) => {
+    const index = messages.findIndex(
+      (msg) => msg.messageId === messageData.messageId
+    );
     if (index !== -1) {
       messages[index].message = messageData.newMessage;
       // We only need to send the ID and new text, the client will handle the update
-      io.emit('editedMessage', { messageId: messageData.messageId, newMessage: messageData.newMessage });
+      io.emit("editedMessage", {
+        messageId: messageData.messageId,
+        newMessage: messageData.newMessage,
+      });
     }
   });
 
   // Listen for a delete message request from a client
-  socket.on('deleteMessage', (messageId) => {
-    const index = messages.findIndex(msg => msg.messageId === messageId);
+  socket.on("deleteMessage", (messageId) => {
+    const index = messages.findIndex((msg) => msg.messageId === messageId);
     if (index !== -1) {
       messages.splice(index, 1); // Remove the message
-      io.emit('deletedMessage', messageId);
+      io.emit("deletedMessage", messageId);
     } else {
       console.log(`Message with ID ${messageId} not found`);
     }
   });
 
-  socket.on('disconnect', () => {
-    console.log('A user disconnected');
+  socket.on("disconnect", () => {
+    console.log("A user disconnected");
   });
 });
 
